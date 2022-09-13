@@ -3,6 +3,7 @@
 
 <strong>Python libraries used</strong>
 <ul>
+<li><strong>pathlib: </strong>Read files.</li>
 <li><strong>djitellopy: </strong>Communicate with and send commands to the Tello.</li>
 <li><strong>opencv-contrib-python: </strong>Detect colors and AR tags.</li>
 </ul>
