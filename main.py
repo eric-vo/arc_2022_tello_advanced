@@ -78,7 +78,7 @@ while i < len(ranges_to_detect):
         if moments['m00'] != 0:
             center_x = int(moments['m10'] / moments['m00'])
             center_y = int(moments['m01'] / moments['m00'])
-            cv.circle(frame, (center_x, center_y), 0, (0, 0, 255), 3)
+            cv.circle(frame, (center_x, center_y), 3, (0, 255, 0), -1)
 
     frame_masked = cv.bitwise_and(frame, frame, mask=mask)
     
