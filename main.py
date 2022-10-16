@@ -3,6 +3,10 @@ from pathlib import Path
 import cv2 as cv
 from djitellopy import Tello
 
+arucoDict = cv.aruco.Dictionary_get(cv.aruco.DICT_ARUCO_ORIGINAL)
+
+DELTA_TIME = 0.1
+
 MIN_CONTOUR_AREA = 50
 
 HSV_RANGES = {
@@ -34,8 +38,25 @@ print("Ranges to detect:", ranges_to_detect)
 
 cap = cv.VideoCapture(0)
 color_found = False
-i = 0
+tag_found = False
 
+class PID:
+    def __init__(self, kP, kI, kD):
+        self.kP = kP
+        self.kI = kI
+        self.kD = kD
+
+        self.i = 0
+        self.last_error = 0
+
+    def perform(self, error):
+        self.p = self.kP * error
+        self.i += self.kI * error * DELTA_TIME
+        self.d = self.kD * (error - self.last_error) / DELTA_TIME
+        self.last_error = error
+        return self.p + self.i + self.d
+
+i = 0
 while i < len(ranges_to_detect):
     # Get the current color to track
     current_lower, current_upper = ranges_to_detect[i]
@@ -81,6 +102,14 @@ while i < len(ranges_to_detect):
             cv.circle(frame, (center_x, center_y), 3, (0, 255, 0), -1)
 
     frame_masked = cv.bitwise_and(frame, frame, mask=mask)
+
+    # Find ArUco markers
+    corners, ids, rejects = cv.aruco.detectMarkers(
+        cv.cvtColor(frame, cv.COLOR_BGR2GRAY),
+        arucoDict
+    )
+
+    # Find the marker closest to the contour  
     
     # Display the frame
     cv.imshow('Tello Camera', frame)
