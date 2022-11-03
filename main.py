@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import cv2 as cv
 from djitellopy import Tello
 
@@ -21,6 +22,8 @@ HSV_RANGES = {
     'PINK': ((156, 100, 100), (179, 255, 255)),
 }
 
+colors_and_ids = {}
+
 # Read the colors to pop from colors.txt
 with open(Path('colors.txt')) as f:
     color_names = f.read().splitlines()
@@ -38,7 +41,8 @@ print("Ranges to detect:", ranges_to_detect)
 
 cap = cv.VideoCapture(0)
 color_found = False
-tag_found = False
+marker_found = False
+
 
 class PID:
     def __init__(self, kP, kI, kD):
@@ -56,8 +60,10 @@ class PID:
         self.last_error = error
         return self.p + self.i + self.d
 
+
 i = 0
-while i < len(ranges_to_detect):
+# Run this code while there are still balloons to pop
+while color_names:
     # Get the current color to track
     current_lower, current_upper = ranges_to_detect[i]
 
@@ -83,13 +89,19 @@ while i < len(ranges_to_detect):
                     largest_contour = contour
                     break
 
+    # If a contour was not found
     if largest_contour is None:
         if color_found:
-            print("Color not found")
+            print("Switching to next color (assuming balloon popped)")
             i += 1
             color_found = False
             continue
+        else:
+            # Make the drone spin if no color found yet
+            # tello.send_rc_control(0, 0, 0, 10)
+            pass
     else:
+        # Draw the contour
         cv.drawContours(frame, [largest_contour], 0, (0, 255, 0), 3)
         color_found = True
 
@@ -109,8 +121,28 @@ while i < len(ranges_to_detect):
         arucoDict
     )
 
-    # Find the marker closest to the contour  
-    
+    if not marker_found:
+        # Find the centroid of the markers if markers are found
+        centroids = []
+        if ids is not None:
+            for i in range(len(ids)):
+                c = corners[i][0]
+                centroids.append(np.mean(c, axis=0))
+
+        # Find the marker centroid closest to the contour
+        if centroids and largest_contour is not None:
+            contour_centroid = [center_x, center_y]
+            centroid_distances = [
+                # Calculates distance between two points
+                np.linalg.norm(marker_centroid - contour_centroid)
+                for marker_centroid in centroids
+            ]
+            closest_marker_index = np.argmin(centroid_distances)
+            marker_found = True
+
+            # Associate the color with the marker ID
+            colors_and_ids[color_names[i]] = ids[closest_marker_index]
+
     # Display the frame
     cv.imshow('Tello Camera', frame)
 
@@ -119,3 +151,10 @@ while i < len(ranges_to_detect):
         break
 
 cv.destroyAllWindows()
+
+# Create a file with color names and marker IDs
+# In the format "COLOR-TAG_NUMBER"
+# With filename 'colors_and_ids.txt'
+with open(Path('colors_and_ids.txt'), 'w') as f:
+    for color_name, marker_id in colors_and_ids.items():
+        f.write(f"{color_name}-{marker_id[0]}")
