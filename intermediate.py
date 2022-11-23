@@ -163,7 +163,7 @@ while ids_to_pop:
                 yaw_err = rvec[0][0][1]
                 yaw_move = yaw_pid.perform(yaw_err)
 
-                tello.send_rc_control(lr_move, fb_move, 0, yaw_move)
+                tello.send_rc_control(round(lr_move), round(fb_move), 0, round(yaw_move))
 
                 last_time = time.time()
         else:
