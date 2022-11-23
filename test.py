@@ -61,7 +61,7 @@ fb_pid = PID(1, 0, 0)
 lr_pid = PID(1, 0, 0)
 yaw_pid = PID(1, 0, 0)
 pop = 10
-tello.takeoff()
+print("tello.takeoff()")
 
 # Run this code while there are still balloons to pop
 while ids_to_pop:
@@ -85,19 +85,19 @@ while ids_to_pop:
 
                     # Stop spinning if spinning
                     if spinning:
-                        tello.send_rc_control(0, 0, 0, 0)
+                        print("tello.send_rc_control(0, 0, 0, 0)")
                         spinning = False
 
                     break
                 else:
                     # Spin if no poppable markers are in sight
                     if not spinning:
-                        tello.send_rc_control(0, 0, 0, 50)
+                        print("tello.send_rc_control(0, 0, 0, 50)")
                         spinning = True
         else:
             # If the Tello cannot see any ArUco markers, spin
             if not spinning:
-                tello.send_rc_control(0, 0, 0, 50)
+                print("tello.send_rc_control(0, 0, 0, 50)")
                 spinning = True
     else:
         # Check if the IDs include the balloon the Tello is following
@@ -118,15 +118,15 @@ while ids_to_pop:
             lr_move = lr_pid.perform(lr_err)
             yaw_err = rvec  # ?
             yaw_move = yaw_pid.perform(yaw_err)
-            tello.send_rc_control(lr_move, fb_move, 0, yaw_move)
+            print("tello.send_rc_control(lr_move, fb_move, 0, yaw_move)")
 
-            
-                
+
+
         else:
             # If the Tello is following a balloon but cannot see that
             # balloon, spin
             if not spinning:
-                tello.send_rc_control(0, 0, 0, 50)
+                print("tello.send_rc_control(0, 0, 0, 50)")
                 spinning = True
             ids_to_pop.remove(str(balloon_following))
             balloon_following = None
@@ -134,15 +134,12 @@ while ids_to_pop:
             lr_pid.reset()
             yaw_pid.reset()
 
-
-
     # Display the frame
     cv.imshow('Tello Camera', frame_read.frame)
 
     # Quit if q is pressed
     if cv.waitKey(1) == ord('q'):
         break
-    
 
 cv.destroyAllWindows()
-tello.land()
+print("tello.land()")
