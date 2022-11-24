@@ -22,14 +22,17 @@ DISTORTION = np.array([-0.033458, 0.105152, 0.001256, -0.006647, 0.000000])
 # The balloon ID the Tello is currently following
 balloon_following = None
 
-# If the Tello is spinning
-spinning = False
+# Extra distance to travel into the balloon (meters)
+POP_DISTANCE = 0.1
 
-# Extra distance to travel into the balloon
-POP_DISTANCE = 10
+# Time before moving onto next marker or spinning again
+WAITING_TIME = 1
+
+# Degrees to spin (counter-clockwise) to search for balloons
+SPIN_AMOUNT = 40
 
 # PID delta time
-DELTA_TIME = 0.5
+DELTA_TIME = 0.2
 last_time = time.time()
 
 
@@ -56,21 +59,29 @@ class PID:
 
 
 # PID controllers
-fb_pid = PID(1, 0, 0)
-lr_pid = PID(1, 0, 0)
-yaw_pid = PID(1, 0, 0)
+fb_pid = PID(8, 2, 0)
+lr_pid = PID(5, 20, 0)
+ud_pid = PID(5, 15, 5)
+yaw_pid = PID(5, 15, 2)
+
+# PID errors
+fb_err = 0
+lr_err = 0
+ud_err = 0
+yaw_err = 0
 
 # Initialize and connect to the Tello
 tello = Tello()
 tello.connect()
 
-print("Battery level: ", tello.get_battery())
+# tello.send_rc_control(0, 0, 0, 0)
+print(tello.get_battery())
 
 # Initialize the camera
 tello.streamon()
 frame_read = tello.get_frame_read()
 
-print("tello.takeoff()")
+# tello.takeoff()
 
 # Run this code while there are still balloons to pop
 while ids_to_pop:
@@ -92,49 +103,20 @@ while ids_to_pop:
                     # set the balloon it is following to that marker
                     balloon_following = id[0]
 
-                    # Stop spinning if spinning
-                    if spinning:
-                        print("tello.send_rc_control(0, 0, 0, 0)")
-                        spinning = False
-
+                    last_time = time.time()
+                    print("Following balloon", balloon_following)
                     break
-                else:
-                    # Spin if no poppable markers are in sight
-                    if not spinning:
-                        print("tello.send_rc_control(0, 0, 0, 50)")
-                        spinning = True
+            else:
+                # Spin if no poppable markers are in sight
+                if time.time() - last_time > WAITING_TIME:
+                    # tello.rotate_counter_clockwise(SPIN_AMOUNT)
+                    last_time = time.time()
         else:
             # If the Tello cannot see any ArUco markers, spin
-            if not spinning:
-                print("tello.send_rc_control(0, 0, 0, 50)")
-                spinning = True
+            if time.time() - last_time > WAITING_TIME:
+                # tello.rotate_counter_clockwise(SPIN_AMOUNT)
+                last_time = time.time()
     else:
-        # If the Tello is following a balloon, check if it can see any
-        # ArUco markers
-        if ids is not None:
-            # If the Tello can see any ArUco markers, check if any of them
-            # are the balloon it is following
-            for i, id in enumerate(ids):
-                if id[0] == balloon_following:
-                    # If the Tello can see the balloon it is following,
-                    # calculate the center of the marker
-                    center = np.mean(corners[i][0], axis=0)
-
-                    # Calculate the error in the x and y directions
-                    x_error = center[0] - 480
-                    y_error = center[1] - 360
-
-                    # Calculate the yaw error
-                    yaw_error = np.arctan2(x_error, y_error)
-
-                    # Calculate the distance to the balloon
-                    distance = np.linalg.norm(center - np.array([480, 360]))
-
-                    # Calculate the PID values
-                    fb = fb_pid.perform(distance)
-                    lr = lr_pid.perform(x_error)
-                    yaw = yaw_pid.perform(yaw_error)
-
         # Check if the IDs include the balloon the Tello is following
         if ids is not None and balloon_following in ids:
             # If enough time has passed
@@ -150,7 +132,7 @@ while ids_to_pop:
                     CAMERA_MATRIX,
                     DISTORTION
                 )
-                print(f"rvec: {rvec}, tvec: {tvec}")
+                # print(f"rvec: {rvec}, tvec: {tvec}")
                 # tvec = (x, y, z)
 
                 # Move towards balloon
@@ -160,27 +142,31 @@ while ids_to_pop:
                 lr_err = tvec[0][0][0]
                 lr_move = lr_pid.perform(lr_err)
 
-                yaw_err = rvec[0][0][1]
-                yaw_move = yaw_pid.perform(yaw_err)
+                ud_err = -tvec[0][0][1]
+                ud_move = ud_pid.perform(ud_err)
 
-                print("tello.send_rc_control(lr_move, fb_move, 0, yaw_move)")
+                # yaw_err = -rvec[0][0][0]
+                yaw_move = yaw_pid.perform(lr_err)
+
+                # tello.send_rc_control(round(lr_move), round(fb_move),
+                #                       round(ud_move), round(yaw_move))
 
                 last_time = time.time()
         else:
-            # If followed balloon is not seen for 1 second
-            if time.time() - last_time >= DELTA_TIME * 2:
-                # If the Tello is following a balloon but cannot see that
-                # balloon, remove that balloon from the list and start spinning
+            # If followed balloon is not seen for the waiting time
+            if time.time() - last_time >= WAITING_TIME:
+                # Remove that balloon from the list and reset movement and PID
                 ids_to_pop.remove(str(balloon_following))
                 balloon_following = None
 
                 fb_pid.reset()
                 lr_pid.reset()
+                ud_pid.reset()
                 yaw_pid.reset()
 
-                if not spinning:
-                    print("tello.send_rc_control(0, 0, 0, 50)")
-                    spinning = True
+                # tello.send_rc_control(0, 0, 0, 0)
+
+                last_time = time.time()
 
     # Outline detected markers
     cv.aruco.drawDetectedMarkers(
@@ -200,8 +186,57 @@ while ids_to_pop:
         2
     )
 
+    # Put text indicating battery level
+    cv.putText(
+        frame_read.frame,
+        f"Battery: {tello.get_battery()}",
+        (10, 60),
+        cv.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 0, 255),
+        2
+    )
+
+    # Put text with the errors on the right side of the screen
+    cv.putText(
+        frame_read.frame,
+        f"FB: {round(fb_err, 2)}",
+        (frame_read.frame.shape[1] - 200, 30),
+        cv.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 0, 255),
+        2
+    )
+    cv.putText(
+        frame_read.frame,
+        f"LR: {round(lr_err, 2)}",
+        (frame_read.frame.shape[1] - 200, 60),
+        cv.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 0, 255),
+        2
+    )
+    cv.putText(
+        frame_read.frame,
+        f"UD: {round(ud_err, 2)}",
+        (frame_read.frame.shape[1] - 200, 90),
+        cv.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 0, 255),
+        2
+    )
+    # cv.putText(
+    #     frame_read.frame,
+    #     f"Yaw: {round(yaw_err, 2)}",
+    #     (frame_read.frame.shape[1] - 200, 120),
+    #     cv.FONT_HERSHEY_SIMPLEX,
+    #     1,
+    #     (0, 0, 255),
+    #     2
+    # )
+
     # Display the frame
-    cv.imshow('Tello Camera', frame_read.frame)
+    cv.imshow("Tello Camera", frame_read.frame)
 
     # Quit if q is pressed
     if cv.waitKey(1) == ord('q'):
@@ -209,5 +244,5 @@ while ids_to_pop:
 
 cv.destroyAllWindows()
 tello.streamoff()
-print("tello.land()")
+# tello.land()
 sys.exit()
