@@ -30,7 +30,7 @@ WAITING_TIME = 1
 
 # Degrees to spin (counter-clockwise) to search for balloons
 SPIN_AMOUNT = 40
-SPIN_LIMIT = 360
+SPIN_LIMIT = 400
 degrees_spun = 0
 
 # PID delta time
