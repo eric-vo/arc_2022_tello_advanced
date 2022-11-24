@@ -30,6 +30,8 @@ WAITING_TIME = 1
 
 # Degrees to spin (counter-clockwise) to search for balloons
 SPIN_AMOUNT = 40
+SPIN_LIMIT = 360
+degrees_spun = 0
 
 # PID delta time
 DELTA_TIME = 0.2
@@ -68,14 +70,14 @@ yaw_pid = PID(5, 15, 2)
 fb_err = 0
 lr_err = 0
 ud_err = 0
-yaw_err = 0
+# yaw_err = 0
 
 # Initialize and connect to the Tello
 tello = Tello()
 tello.connect()
 
-# tello.send_rc_control(0, 0, 0, 0)
-print(tello.get_battery())
+tello.send_rc_control(0, 0, 0, 0)
+print("Battery level: ", tello.get_battery())
 
 # Initialize the camera
 tello.streamon()
@@ -84,7 +86,7 @@ frame_read = tello.get_frame_read()
 # tello.takeoff()
 
 # Run this code while there are still balloons to pop
-while ids_to_pop:
+while True:
     # Find ArUco markers
     corners, ids, rejects = cv.aruco.detectMarkers(
         cv.cvtColor(frame_read.frame, cv.COLOR_BGR2GRAY),
@@ -103,24 +105,30 @@ while ids_to_pop:
                     # set the balloon it is following to that marker
                     balloon_following = id[0]
 
+                    # Reset the time counter so there's no accidental landing
                     last_time = time.time()
-                    print("Following balloon", balloon_following)
+
+                    degrees_spun = 0
+
                     break
             else:
                 # Spin if no poppable markers are in sight
                 if time.time() - last_time > WAITING_TIME:
                     # tello.rotate_counter_clockwise(SPIN_AMOUNT)
                     last_time = time.time()
+                    degrees_spun += SPIN_AMOUNT
         else:
             # If the Tello cannot see any ArUco markers, spin
             if time.time() - last_time > WAITING_TIME:
                 # tello.rotate_counter_clockwise(SPIN_AMOUNT)
                 last_time = time.time()
+                degrees_spun += SPIN_AMOUNT
     else:
         # Check if the IDs include the balloon the Tello is following
         if ids is not None and balloon_following in ids:
-            # If enough time has passed
+            # If it's time to perform PID
             if time.time() - last_time >= DELTA_TIME:
+                # Get the corners of the balloon the Tello is following
                 corners_following = np.array(corners[
                     np.where(ids == balloon_following)[0][0]
                 ])
@@ -145,7 +153,8 @@ while ids_to_pop:
                 ud_err = -tvec[0][0][1]
                 ud_move = ud_pid.perform(ud_err)
 
-                # yaw_err = -rvec[0][0][0]
+                # Yaw error is inconsistent, so use the left-right error
+                # yaw_err = -rvec[0][0][1]
                 yaw_move = yaw_pid.perform(lr_err)
 
                 # tello.send_rc_control(round(lr_move), round(fb_move),
@@ -155,8 +164,7 @@ while ids_to_pop:
         else:
             # If followed balloon is not seen for the waiting time
             if time.time() - last_time >= WAITING_TIME:
-                # Remove that balloon from the list and reset movement and PID
-                ids_to_pop.remove(str(balloon_following))
+                # Reset movement and PID
                 balloon_following = None
 
                 fb_pid.reset()
@@ -237,6 +245,10 @@ while ids_to_pop:
 
     # Display the frame
     cv.imshow("Tello Camera", frame_read.frame)
+
+    # If the drone has spun at or past the spin limit, break
+    if degrees_spun >= SPIN_LIMIT:
+        break
 
     # Quit if q is pressed
     if cv.waitKey(1) == ord('q'):
