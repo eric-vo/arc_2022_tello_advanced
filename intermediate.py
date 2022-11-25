@@ -128,9 +128,9 @@ while True:
             # If it's time to perform PID
             if time.time() - last_time >= DELTA_TIME:
                 # Get the corners of the balloon the Tello is following
-                corners_following = np.array(corners[
-                    np.where(ids == balloon_following)[0][0]
-                ])
+                corners_following = np.array(
+                    corners[np.where(ids == balloon_following)[0][0]]
+                )
 
                 # Calculate the vectors to the balloon
                 rvec, tvec, _ = cv.aruco.estimatePoseSingleMarkers(
@@ -176,11 +176,7 @@ while True:
                 last_time = time.time()
 
     # Outline detected markers
-    cv.aruco.drawDetectedMarkers(
-        frame_read.frame,
-        corners,
-        ids
-    )
+    cv.aruco.drawDetectedMarkers(frame_read.frame, corners, ids)
 
     (topLeft, topRight, bottomRight, bottomLeft) = corners
     centerX = topLeft[0] + topRight[0] + bottomRight[0] + bottomLeft[0]
@@ -188,26 +184,29 @@ while True:
     centerY = topLeft[1] + topRight[1] + bottomRight[1] + bottomLeft[1]
     centerY /= 4
 
-    cv2.line(frame_read.frame,
-             (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
-             (centerX, centerY),
-             (255, 0, 0),
-             2
-            )
+    cv.line(
+        frame_read.frame,
+        (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
+        (centerX, centerY),
+        (255, 0, 0),
+        2
+    )
 
-    cv2.line(frame_read.frame,
-             (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
-             (centerX, frame_read.frame.shape[0] // 2),
-             (0, 255, 0),
-             2
-            )
+    cv.line(
+        frame_read.frame,
+        (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
+        (centerX, frame_read.frame.shape[0] // 2),
+        (0, 255, 0),
+        2
+    )
 
-    cv2.line(frame_read.frame,
-             (centerX, frame_read.frame.shape[0] // 2),
-             (centerX, centerY),
-             (0, 0, 255),
-             2
-             )
+    cv.line(
+        frame_read.frame,
+        (centerX, frame_read.frame.shape[0] // 2),
+        (centerX, centerY),
+        (0, 0, 255),
+        2
+    )
 
     # Put text indicating which balloon the Tello is following
     cv.putText(
