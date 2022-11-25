@@ -23,10 +23,10 @@ DISTORTION = np.array([-0.033458, 0.105152, 0.001256, -0.006647, 0.000000])
 balloon_following = None
 
 # Extra distance to travel into the balloon (meters)
-POP_DISTANCE = 0.1
+POP_DISTANCE = 0.2
 
 # Time before moving onto next marker or spinning again
-WAITING_TIME = 1
+WAITING_TIME = 0.7
 
 # Degrees to spin (counter-clockwise) to search for balloons
 SPIN_AMOUNT = 40
@@ -48,12 +48,11 @@ class PID:
         self.last_error = 0
 
     def perform(self, error):
-        self.p = self.kP * error
-        self.i += self.kI * error * DELTA_TIME
-        self.d = self.kD * (error - self.last_error) / DELTA_TIME
+        self.i += error * DELTA_TIME
+        self.d = (error - self.last_error) / DELTA_TIME
         self.last_error = error
 
-        return self.p + self.i + self.d
+        return self.kP * error + self.kI * self.i + self.kD * self.d
 
     def reset(self):
         self.i = 0
@@ -61,10 +60,10 @@ class PID:
 
 
 # PID controllers
-fb_pid = PID(8, 2, 0)
-lr_pid = PID(5, 20, 0)
-ud_pid = PID(5, 15, 5)
-yaw_pid = PID(5, 15, 2)
+fb_pid = PID(20, 0, 10)
+lr_pid = PID(20, 3, 10)
+ud_pid = PID(15, 1, 10)
+yaw_pid = PID(10, 2, 10)
 
 # PID errors
 fb_err = 0
@@ -243,6 +242,15 @@ while True:
     #     2
     # )
 
+    # Put a dot in the center of the screen
+    cv.circle(
+        frame_read.frame,
+        (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
+        5,
+        (255, 0, 0),
+        -1
+    )
+
     # Display the frame
     cv.imshow("Tello Camera", frame_read.frame)
 
@@ -257,4 +265,6 @@ while True:
 cv.destroyAllWindows()
 tello.streamoff()
 tello.land()
+tello.send_rc_control(0, 0, 0, 0)
+print("Battery level: ", tello.get_battery())
 sys.exit()
