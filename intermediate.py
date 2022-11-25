@@ -34,7 +34,7 @@ SPIN_LIMIT = 400
 degrees_spun = 0
 
 # PID delta time
-DELTA_TIME = 0.2
+DELTA_TIME = 0.1
 last_time = time.time()
 
 
@@ -60,10 +60,10 @@ class PID:
 
 
 # PID controllers
-fb_pid = PID(20, 0, 10)
-lr_pid = PID(20, 3, 10)
-ud_pid = PID(15, 1, 10)
-yaw_pid = PID(10, 2, 10)
+fb_pid = PID(15, 0, 2)
+lr_pid = PID(20, 0, 5)
+ud_pid = PID(20, 0, 2)
+yaw_pid = PID(25, 0, 5)
 
 # PID errors
 fb_err = 0
