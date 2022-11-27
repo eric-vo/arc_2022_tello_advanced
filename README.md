@@ -1,4 +1,4 @@
-<h1>Eric Vo, Reva Amritkar, & Anna David</h1>
+<h1>Eric Vo, Anna David, & Reva Amritkar</h1>
 <p>This is our submission for the Aerospace Robotics Competition's 2022 Tello Competition.</p>
 
 <strong>Python libraries used</strong>
