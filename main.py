@@ -23,7 +23,7 @@ DISTORTION = np.array([-0.033458, 0.105152, 0.001256, -0.006647, 0.000000])
 balloon_following = None
 
 # Extra distance to travel into the balloon (meters)
-POP_DISTANCE = .1
+POP_DISTANCE = 0.2
 
 # Time before moving onto next marker or spinning again
 WAITING_TIME = 2.2
@@ -37,9 +37,6 @@ degrees_spun = 0
 # PID delta time
 DELTA_TIME = 0.1
 last_time = time.time()
-
-# Counter variable to let the drone align before moving forward
-align_counter = 0
 
 
 class PID:
@@ -64,10 +61,10 @@ class PID:
 
 
 # PID controllers
-fb_pid = PID(15, 0, 20)
-lr_pid = PID(15, 10, 40)
-ud_pid = PID(15, 10, 35)
-yaw_pid = PID(15, 10, 40)
+fb_pid = PID(15, 0, 2)
+lr_pid = PID(20, 0, 5)
+ud_pid = PID(20, 0, 2)
+yaw_pid = PID(25, 0, 5)
 
 # PID errors
 fb_err = 0
@@ -150,22 +147,14 @@ while True:
                 # tvec = (x, y, z)
 
                 # Move towards balloon
-<<<<<<< HEAD:main.py
-                if align_counter >= 15:
-                    fb_err = tvec[0][0][2] + POP_DISTANCE
-                    fb_move = fb_pid.perform(fb_err)
-                else:
-                    fb_move = 0
-=======
                 fb_err = tvec[0][0][2] + POP_DISTANCE
                 fb_move = fb_pid.perform(fb_err)
                 
->>>>>>> 6bf2f9bc040c00f1df551b69f47003d4c4cf2a6b:intermediate.py
 
                 lr_err = tvec[0][0][0]
                 lr_move = lr_pid.perform(lr_err)
 
-                ud_err = -tvec[0][0][1] + 0.02
+                ud_err = -tvec[0][0][1]
                 ud_move = ud_pid.perform(ud_err)
 
                 if (fb_err < 0.5 and fb_err > -0.5) and ((lr_err > 0.1 or lr_err < -0.1) or (ud_err > 0.1 or ud_err < -0.1)):
@@ -185,37 +174,6 @@ while True:
                                       int(ud_move), int(yaw_move))
 
                 last_time = time.time()
-                align_counter += 1
-
-                # (topLeft, topRight, bottomRight, bottomLeft) = corners_following[0]
-                # centerX = topLeft[0] + topRight[0] + bottomRight[0] + bottomLeft[0]
-                # centerX /= 4
-                # centerY = topLeft[1] + topRight[1] + bottomRight[1] + bottomLeft[1]
-                # centerY /= 4
-
-                # cv.line(
-                #     frame_read.frame,
-                #     (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
-                #     (centerX, centerY),
-                #     (255, 0, 0),
-                #     2
-                # )
-
-                # cv.line(
-                #     frame_read.frame,
-                #     (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
-                #     (centerX, frame_read.frame.shape[0] // 2),
-                #     (0, 255, 0),
-                #     2
-                # )
-
-                # cv.line(
-                #     frame_read.frame,
-                #     (centerX, frame_read.frame.shape[0] // 2),
-                #     (centerX, centerY),
-                #     (0, 0, 255),
-                #     2
-                # )
         else:
             # If followed balloon is not seen for the waiting time
             if time.time() - last_time >= WAITING_TIME:
@@ -232,14 +190,10 @@ while True:
                 
 
                 last_time = time.time()
-<<<<<<< HEAD:main.py
-                align_counter = 0
-=======
             #else:
              #   tello.send_rc_control(lr_move/1.5, 100, ud_move/1.5, 0)
             #else:
              #   tello.send_rc_control(0,100,0,0)
->>>>>>> 6bf2f9bc040c00f1df551b69f47003d4c4cf2a6b:intermediate.py
 
     # Outline detected markers
     cv.aruco.drawDetectedMarkers(frame_read.frame, corners, ids)
@@ -250,8 +204,6 @@ while True:
         centerY = topLeft[1] + topRight[1] + bottomRight[1] + bottomLeft[1]
         centerY /= 4
 
-<<<<<<< HEAD:main.py
-=======
     #cv.line(
     #    frame_read.frame,
     #    (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
@@ -276,7 +228,6 @@ while True:
     #    2
     #)
 
->>>>>>> 6bf2f9bc040c00f1df551b69f47003d4c4cf2a6b:intermediate.py
     # Put text indicating which balloon the Tello is following
     cv.putText(
         frame_read.frame,
