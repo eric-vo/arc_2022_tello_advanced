@@ -9,7 +9,7 @@ from djitellopy import Tello
 aruco_dict = cv.aruco.Dictionary_get(cv.aruco.DICT_ARUCO_ORIGINAL)
 
 # Read the IDs to pop from 'ids_to_pop.txt'
-with open(Path('ids_to_pop.txt')) as f:
+with open(Path(r'arc_2022_tello_advanced/ids_to_pop.txt')) as f:
     ids_to_pop = f.read().splitlines()
 print("IDs to pop:", ids_to_pop)
 
@@ -26,7 +26,8 @@ balloon_following = None
 POP_DISTANCE = 0.2
 
 # Time before moving onto next marker or spinning again
-WAITING_TIME = 0.7
+WAITING_TIME = 2.2
+SPIN_TIME = 0.6
 
 # Degrees to spin (counter-clockwise) to search for balloons
 SPIN_AMOUNT = 40
@@ -40,17 +41,17 @@ last_time = time.time()
 
 class PID:
     def __init__(self, kP, kI, kD):
-        self.kP = kP
-        self.kI = kI
-        self.kD = kD
+        self.kP = int(kP)
+        self.kI = int(kI)
+        self.kD = int(kD)
 
         self.i = 0
         self.last_error = 0
 
     def perform(self, error):
-        self.i += error * DELTA_TIME
-        self.d = (error - self.last_error) / DELTA_TIME
-        self.last_error = error
+        self.i += int(error * DELTA_TIME)
+        self.d = int((error - self.last_error) / DELTA_TIME)
+        self.last_error = int(error)
 
         return self.kP * error + self.kI * self.i + self.kD * self.d
 
@@ -83,6 +84,9 @@ tello.streamon()
 frame_read = tello.get_frame_read()
 
 tello.takeoff()
+while (tello.get_height() < 70):
+    tello.send_rc_control(0,0,15,0)
+#tello.move_up(20)
 
 # Run this code while there are still balloons to pop
 while True:
@@ -112,13 +116,13 @@ while True:
                     break
             else:
                 # Spin if no poppable markers are in sight
-                if time.time() - last_time > WAITING_TIME:
+                if time.time() - last_time > SPIN_TIME:
                     tello.rotate_counter_clockwise(SPIN_AMOUNT)
                     last_time = time.time()
                     degrees_spun += SPIN_AMOUNT
         else:
             # If the Tello cannot see any ArUco markers, spin
-            if time.time() - last_time > WAITING_TIME:
+            if time.time() - last_time > SPIN_TIME:
                 tello.rotate_counter_clockwise(SPIN_AMOUNT)
                 last_time = time.time()
                 degrees_spun += SPIN_AMOUNT
@@ -145,6 +149,7 @@ while True:
                 # Move towards balloon
                 fb_err = tvec[0][0][2] + POP_DISTANCE
                 fb_move = fb_pid.perform(fb_err)
+                
 
                 lr_err = tvec[0][0][0]
                 lr_move = lr_pid.perform(lr_err)
@@ -152,18 +157,29 @@ while True:
                 ud_err = -tvec[0][0][1]
                 ud_move = ud_pid.perform(ud_err)
 
+                if (fb_err < 0.5 and fb_err > -0.5) and ((lr_err > 0.1 or lr_err < -0.1) or (ud_err > 0.1 or ud_err < -0.1)):
+                    fb_move = 0
+                elif fb_err < 0.5 and fb_err > -0.5:
+                    fb_move = 100
+                
+                #if fb_err < 0.5 and fb_err > -0.5:
+                 #   ud_move = 0
+
+
                 # Yaw error is inconsistent, so use the left-right error
                 # yaw_err = -rvec[0][0][1]
-                yaw_move = yaw_pid.perform(lr_err)
+                yaw_move = 0 # yaw_pid.perform(lr_err)
 
-                tello.send_rc_control(round(lr_move), round(fb_move),
-                                      round(ud_move), round(yaw_move))
+                tello.send_rc_control(int(lr_move), int(fb_move),
+                                      int(ud_move), int(yaw_move))
 
                 last_time = time.time()
         else:
             # If followed balloon is not seen for the waiting time
             if time.time() - last_time >= WAITING_TIME:
                 # Reset movement and PID
+                tello.send_rc_control(0, 0, 0, 0)
+
                 balloon_following = None
 
                 fb_pid.reset()
@@ -171,42 +187,46 @@ while True:
                 ud_pid.reset()
                 yaw_pid.reset()
 
-                tello.send_rc_control(0, 0, 0, 0)
+                
 
                 last_time = time.time()
+            #else:
+             #   tello.send_rc_control(lr_move/1.5, 100, ud_move/1.5, 0)
+            #else:
+             #   tello.send_rc_control(0,100,0,0)
 
     # Outline detected markers
     cv.aruco.drawDetectedMarkers(frame_read.frame, corners, ids)
+    if len(corners) == 4:
+        (topLeft, topRight, bottomRight, bottomLeft) = corners
+        centerX = topLeft[0] + topRight[0] + bottomRight[0] + bottomLeft[0]
+        centerX /= 4
+        centerY = topLeft[1] + topRight[1] + bottomRight[1] + bottomLeft[1]
+        centerY /= 4
 
-    (topLeft, topRight, bottomRight, bottomLeft) = corners
-    centerX = topLeft[0] + topRight[0] + bottomRight[0] + bottomLeft[0]
-    centerX /= 4
-    centerY = topLeft[1] + topRight[1] + bottomRight[1] + bottomLeft[1]
-    centerY /= 4
+    #cv.line(
+    #    frame_read.frame,
+    #    (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
+    #    (centerX, centerY),
+    #    (255, 0, 0),
+    #    2
+    #)
 
-    cv.line(
-        frame_read.frame,
-        (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
-        (centerX, centerY),
-        (255, 0, 0),
-        2
-    )
+    #cv.line(
+    #    frame_read.frame,
+    #    (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
+    #    (centerX, frame_read.frame.shape[0] // 2),
+    #    (0, 255, 0),
+    #    2
+    #)
 
-    cv.line(
-        frame_read.frame,
-        (frame_read.frame.shape[1] // 2, frame_read.frame.shape[0] // 2),
-        (centerX, frame_read.frame.shape[0] // 2),
-        (0, 255, 0),
-        2
-    )
-
-    cv.line(
-        frame_read.frame,
-        (centerX, frame_read.frame.shape[0] // 2),
-        (centerX, centerY),
-        (0, 0, 255),
-        2
-    )
+    #cv.line(
+    #    frame_read.frame,
+    #    (centerX, frame_read.frame.shape[0] // 2),
+    #    (centerX, centerY),
+    #    (0, 0, 255),
+    #    2
+    #)
 
     # Put text indicating which balloon the Tello is following
     cv.putText(
@@ -289,8 +309,8 @@ while True:
         break
 
 cv.destroyAllWindows()
+tello.send_rc_control(0, 0, 0, 0)
 tello.streamoff()
 tello.land()
-tello.send_rc_control(0, 0, 0, 0)
 print("Battery level: ", tello.get_battery())
 sys.exit()
